@@ -1,7 +1,8 @@
 module load python-dev/3.5.2
 
 # Requirement for tensorflow 1.0
-module load cuda/8.0.27rc
+module load cuda/8.0.44
+module load cudnn/8.0-v5.1
 module load numpy-dev
 module load scipy-dev/0.17.1
 
