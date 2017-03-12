@@ -1,18 +1,11 @@
 import tensorflow as tf
 import os, sys
 
-# Use second GPU -- change if you want to use a first one
-# os.environ["CUDA_VISIBLE_DEVICES"] = '1'
-
-# Add a path to a custom fork of TF-Slim
-# Get it from here:
-# https://github.com/warmspringwinds/models/tree/fully_conv_vgg
 sys.path.append("/home/jochiu/Fully_CNN/models/slim/")
 
-# Add path to the cloned library
 sys.path.append("/home/jochiu/Fully_CNN/")
 
-checkpoints_dir = '/home/jochiu/Fully_CNN/checkpoints'
+checkpoints_dir = '/home/jochiu/Fully_CNN/'
 log_folder = '/home/jochiu/Fully_CNN/log'
 
 
@@ -58,8 +51,8 @@ image_batch, annotation_batch = tf.train.shuffle_batch( [resized_image, resized_
                                              num_threads=2,
                                              min_after_dequeue=1000)
 
-upsampled_logits_batch, vgg_16_variables_mapping = fcn_16s(image_batch_tensor=image_batch,
-                                                           number_of_classes=number_of_classes,
+upsampled_logits_batch, vgg_16_variables_mapping = fcn_16s(image_batch=image_batch,
+                                                           num_classes=number_of_classes,
                                                            is_training=True)
 
 
@@ -124,7 +117,7 @@ with tf.Session()  as sess:
     threads = tf.train.start_queue_runners(coord=coord)
     
     # 10 epochs
-    for i in range(1112 * 10):
+    for i in range(1112):
     
         cross_entropy, summary_string, _ = sess.run([ cross_entropy_sum,
                                                       merged_summary_op,
@@ -134,15 +127,15 @@ with tf.Session()  as sess:
         
         summary_string_writer.add_summary(summary_string, i)
         
-        if i % 1112 == 0:
-            save_path = saver.save(sess, "/home/jochiu/tf-image-segmentation/tf_image_segmentation/model_fcn32s.ckpt")
+        if i % 110 == 0:
+            save_path = saver.save(sess, "/home/jochiu/Fully_CNN/model_fcn32s.ckpt")
             print("Model saved in file: %s" % save_path)
             
         
     coord.request_stop()
     coord.join(threads)
     
-    save_path = saver.save(sess, "/home/jochiu/tf-image-segmentation/tf_image_segmentation/model_fcn32s.ckpt")
+    save_path = saver.save(sess, "/home/jochiu/Fully_CNN/model_fcn32s.ckpt")
     print("Model saved in file: %s" % save_path)
     
 summary_string_writer.close()
