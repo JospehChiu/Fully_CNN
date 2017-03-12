@@ -1,9 +1,9 @@
 import tensorflow as tf
 import numpy as np
 from utils.upsampling import bilinear_upsample_weights
+from tensorflow.contrib.slim.python.slim.nets import vgg
 
 slim = tf.contrib.slim
-vgg = tf.contrib.slim.python.slim.nets
 
 def fcn_16s(image_batch, num_classes, is_training):
     # Get the filters for upsampling by factor 2 and 16
