@@ -1,17 +1,14 @@
 import tensorflow as tf
-import numpy as np
-import skimage.io as io
-import os, sys
+import sys
 import time
 
-sys.path.append("/home/boyaolin/Fully_CNN/tf-image-segmentation/models/slim/")
+sys.path.append("/home/boyaolin/Fully_CNN/models/slim/")
+sys.path.append("/home/boyaolin/Fully_CNN/")
 
-sys.path.append("/home/boyaolin/Fully_CNN/tf-image-segmentation/")
-
-from tf_image_segmentation.models.fcn_32s import FCN_32s
-from tf_image_segmentation.utils.pascal_voc import pascal_segmentation_lut
-from tf_image_segmentation.utils.tf_records import read_tfrecord_and_decode_into_image_annotation_pair_tensors
-from tf_image_segmentation.utils.inference import adapt_network_for_any_size_input
+from model import fcn_16s
+from utils.pascal_voc import pascal_segmentation_lut
+from utils.tf_records import read_tfrecord_and_decode_into_image_annotation_pair_tensors
+from utils.inference import adapt_network_for_any_size_input
 
 slim = tf.contrib.slim
 
@@ -26,9 +23,9 @@ image, annotation = read_tfrecord_and_decode_into_image_annotation_pair_tensors(
 image_batch = tf.expand_dims(image, axis=0)
 annotation_batch = tf.expand_dims(annotation, axis=0)
 
-FCN_32s = adapt_network_for_any_size_input(FCN_32s, 32)
+fcn_16s = adapt_network_for_any_size_input(fcn_16s, 16)
 
-pred, fcn_32s_variables_mapping = FCN_32s(image_batch_tensor=image_batch,
+pred, fcn_32s_variables_mapping = fcn_16s(image_batch_tensor=image_batch,
                                           number_of_classes=number_of_classes,
                                           is_training=False)
 

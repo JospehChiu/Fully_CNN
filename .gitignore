@@ -93,3 +93,6 @@ TrainVal/
 
 # Project file
 *.tar
+
+# tensorflow model check point file
+*.ckpt
