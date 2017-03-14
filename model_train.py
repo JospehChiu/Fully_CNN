@@ -1,31 +1,23 @@
 import tensorflow as tf
 import os, sys
+from model import fcn_16s
 
 sys.path.append("/home/jochiu/Fully_CNN/models/slim/")
-
 sys.path.append("/home/jochiu/Fully_CNN/")
 
-checkpoints_dir = '/home/jochiu/Fully_CNN/'
-log_folder = '/home/jochiu/Fully_CNN/log'
-
-
 slim = tf.contrib.slim
-vgg_checkpoint_path = os.path.join(checkpoints_dir, 'vgg_16.ckpt')
+vgg_checkpoint_path = '/home/jochiu/Fully_CNN/vgg_16.ckpt'
 
 from utils.tf_records import read_tfrecord_and_decode_into_image_annotation_pair_tensors
-from model import fcn_16s
 from utils.extract_vgg_16_mapping_without_fc8 import extract_vgg_16_mapping_without_fc8
 from utils.pascal_voc import pascal_segmentation_lut
-
 from utils.training import get_valid_logits_and_labels
-
-from utils.augmentation import (distort_randomly_image_color,
-                                flip_randomly_left_right_image_with_annotation,
+from utils.augmentation import (flip_randomly_left_right_image_with_annotation,
                                 scale_randomly_image_with_annotation_with_fixed_size_output)
 
 image_train_size = [384, 384]
 number_of_classes = 21
-tfrecord_filename = 'pascal_augmented_train.tfrecords'
+tfrecord_filename = 'train.tfrecords'
 pascal_voc_lut = pascal_segmentation_lut()
 class_labels = pascal_voc_lut.keys()
 
@@ -35,10 +27,7 @@ filename_queue = tf.train.string_input_producer(
 
 image, annotation = read_tfrecord_and_decode_into_image_annotation_pair_tensors(filename_queue)
 
-# Various data augmentation stages
 image, annotation = flip_randomly_left_right_image_with_annotation(image, annotation)
-
-# image = distort_randomly_image_color(image)
 
 resized_image, resized_annotation = scale_randomly_image_with_annotation_with_fixed_size_output(image, annotation, image_train_size)
 
@@ -55,12 +44,9 @@ upsampled_logits_batch, vgg_16_variables_mapping = fcn_16s(image_batch=image_bat
                                                            num_classes=number_of_classes,
                                                            is_training=True)
 
-
 valid_labels_batch_tensor, valid_logits_batch_tensor = get_valid_logits_and_labels(annotation_batch_tensor=annotation_batch,
                                                                                      logits_batch_tensor=upsampled_logits_batch,
                                                                                     class_labels=class_labels)
-
-
 
 cross_entropies = tf.nn.softmax_cross_entropy_with_logits(logits=valid_logits_batch_tensor,
                                                           labels=valid_labels_batch_tensor)
@@ -90,14 +76,6 @@ global_vars_init_op = tf.global_variables_initializer()
 tf.summary.scalar('cross_entropy_loss', cross_entropy_sum)
 
 merged_summary_op = tf.summary.merge_all()
-
-summary_string_writer = tf.summary.FileWriter(log_folder)
-
-# Create the log folder if doesn't exist yet
-if not os.path.exists(log_folder):
-     os.makedirs(log_folder)
-    
-#The op for initializing the variables.
 local_vars_init_op = tf.local_variables_initializer()
 
 combined_op = tf.group(local_vars_init_op, global_vars_init_op)
@@ -106,7 +84,6 @@ combined_op = tf.group(local_vars_init_op, global_vars_init_op)
 # optimization-related and other variables.
 model_variables = slim.get_model_variables()
 saver = tf.train.Saver(model_variables)
-
 
 with tf.Session()  as sess:
     
@@ -117,25 +94,21 @@ with tf.Session()  as sess:
     threads = tf.train.start_queue_runners(coord=coord)
     
     # 10 epochs
-    for i in range(1112):
-    
+    for i in range(1112*10):
         cross_entropy, summary_string, _ = sess.run([ cross_entropy_sum,
                                                       merged_summary_op,
                                                       train_step ])
-        
-        print("Current loss: " + str(cross_entropy))
-        
+
+        print("Loss: " + str(cross_entropy))
         summary_string_writer.add_summary(summary_string, i)
-        
-        if i % 110 == 0:
-            save_path = saver.save(sess, "/home/jochiu/Fully_CNN/model_fcn32s.ckpt")
-            print("Model saved in file: %s" % save_path)
+        if i % 1112 == 0:
+            save_path = saver.save(sess, "/home/jochiu/Fully_CNN/model_32s.ckpt")
+            print("Save")
             
-        
     coord.request_stop()
     coord.join(threads)
     
-    save_path = saver.save(sess, "/home/jochiu/Fully_CNN/model_fcn32s.ckpt")
-    print("Model saved in file: %s" % save_path)
+    save_path = saver.save(sess, "/home/jochiu/Fully_CNN/model_32s.ckpt")
+    print("Save")
     
 summary_string_writer.close()

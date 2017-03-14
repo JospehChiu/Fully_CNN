@@ -1,11 +1,11 @@
 import tensorflow as tf
 import numpy as np
-from utils.upsampling import bilinear_upsample_weights
-from models.slim.nets import vgg
+from upsampling import bilinear_upsample_weights
+import vgg
 
 slim = tf.contrib.slim
 
-def fcn_16s(image_batch, num_classes, is_training):
+def fcn_16s(image_batch_tensor, num_classes, is_training):
     # Get the filters for upsampling by factor 2 and 16
     upsample_by_2_weights = bilinear_upsample_weights(factor = 2, 
                                                       number_of_classes = num_classes)
@@ -14,7 +14,7 @@ def fcn_16s(image_batch, num_classes, is_training):
                                                        number_of_classes = num_classes)
     upsample_by_16_filter = tf.constant(upsample_by_16_weights)
     
-    image_batch_float = tf.to_float(image_batch)
+    image_batch_float = tf.to_float(image_batch_tensor)
     
     # Create a variable scope for our model
     with tf.variable_scope('fcn_16s') as fcn_16s_scope:
@@ -30,7 +30,6 @@ def fcn_16s(image_batch, num_classes, is_training):
                                                    spatial_squeeze=False,
                                                    fc_conv_padding='SAME')
             vgg_layer_shape = tf.shape(vgg_logits)
-            
             
             # Calculate the size of the tensor upsampled by two times
             # vgg_layer_shape[0] is the batch size

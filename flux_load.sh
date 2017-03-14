@@ -9,4 +9,4 @@ module load scipy-dev/0.17.1
 export TF_BINARY_URL=https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.0.1-cp35-cp35m-linux_x86_64.whl
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/sw/arcts/centos7/modulefiles/cuda/lib64"
 
-pip install --user --upgrade $TF_BINARY_URL
+# pip install --user --upgrade $TF_BINARY_URL
