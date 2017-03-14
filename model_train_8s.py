@@ -2,27 +2,18 @@ import tensorflow as tf
 import numpy as np
 import skimage.io as io
 import os, sys
-from PIL import Image
-
-sys.path.append("/home/jochiu/tf-image-segmentation/models/slim/")
-
-sys.path.append("/home/jochiu/tf-image-segmentation/")
-
-checkpoints_dir = '/home/jochiu/tf-image-segmentation/tf_image_segmentation'
-log_folder = '/home/jochiu/tf-image-segmentation/tf_image_segmentation/log'
-
-slim = tf.contrib.slim
 
 from utils.tf_records import read_tfrecord_and_decode_into_image_annotation_pair_tensors
-from models.fcn_8s import FCN_8s
+from models.fcn_8s import FCN_8s, extract_vgg_16_mapping_without_fc8
+from utils.pascal_voc import pascal_segmentation_lut
+from utils.training import get_valid_logits_and_labels
+from utils.augmentation import (distort_randomly_image_color,
+                                flip_randomly_left_right_image_with_annotation,
+                                scale_randomly_image_with_annotation_with_fixed_size_output)
 
-from tf_image_segmentation.utils.pascal_voc import pascal_segmentation_lut
-
-from tf_image_segmentation.utils.training import get_valid_logits_and_labels
-
-from tf_image_segmentation.utils.augmentation import (distort_randomly_image_color,
-                                                      flip_randomly_left_right_image_with_annotation,
-                                                      scale_randomly_image_with_annotation_with_fixed_size_output)
+slim = tf.contrib.slim
+vgg_checkpoint_path = '/home/jochiu/Fully_CNN/vgg_16.ckpt'
+log_folder = '/home/jochiu/Fully_CNN/log'
 
 image_train_size = [384, 384]
 number_of_classes = 21
@@ -30,17 +21,13 @@ tfrecord_filename = 'pascal_augmented_train.tfrecords'
 pascal_voc_lut = pascal_segmentation_lut()
 class_labels = pascal_voc_lut.keys()
 
-fcn_16s_checkpoint_path = "/home/jochiu/tf-image-segmentation/tf_image_segmentation/model_fcn16s_final.ckpt"
 
 filename_queue = tf.train.string_input_producer(
     [tfrecord_filename], num_epochs=10)
 
 image, annotation = read_tfrecord_and_decode_into_image_annotation_pair_tensors(filename_queue)
 
-# Various data augmentation stages
 image, annotation = flip_randomly_left_right_image_with_annotation(image, annotation)
-
-# image = distort_randomly_image_color(image)
 
 resized_image, resized_annotation = scale_randomly_image_with_annotation_with_fixed_size_output(image, annotation, image_train_size)
 
@@ -53,7 +40,7 @@ image_batch, annotation_batch = tf.train.shuffle_batch( [resized_image, resized_
                                              num_threads=2,
                                              min_after_dequeue=1000)
 
-upsampled_logits_batch, fcn_16s_variables_mapping = FCN_8s(image_batch_tensor=image_batch,
+upsampled_logits_batch, vgg_16_variables_mapping = FCN_32s(image_batch_tensor=image_batch,
                                                            number_of_classes=number_of_classes,
                                                            is_training=True)
 
@@ -67,17 +54,24 @@ valid_labels_batch_tensor, valid_logits_batch_tensor = get_valid_logits_and_labe
 cross_entropies = tf.nn.softmax_cross_entropy_with_logits(logits=valid_logits_batch_tensor,
                                                           labels=valid_labels_batch_tensor)
 
+# Normalize the cross entropy -- the number of elements
+# is different during each step due to mask out regions
 cross_entropy_sum = tf.reduce_mean(cross_entropies)
 
 pred = tf.argmax(upsampled_logits_batch, dimension=3)
 
 probabilities = tf.nn.softmax(upsampled_logits_batch)
 
-with tf.variable_scope("adam_vars"):
-    train_step = tf.train.AdamOptimizer(learning_rate=0.000000001).minimize(cross_entropy_sum)
 
-init_fn = slim.assign_from_checkpoint_fn(model_path=fcn_16s_checkpoint_path,
-                                         var_list=fcn_16s_variables_mapping)
+with tf.variable_scope("adam_vars"):
+    train_step = tf.train.AdamOptimizer(learning_rate=0.000001).minimize(cross_entropy_sum)
+
+
+vgg_16_without_fc8_variables_mapping = extract_vgg_16_mapping_without_fc8(vgg_16_variables_mapping)
+
+
+init_fn = slim.assign_from_checkpoint_fn(model_path=vgg_checkpoint_path,
+                                         var_list=vgg_16_without_fc8_variables_mapping)
 
 global_vars_init_op = tf.global_variables_initializer()
 
@@ -87,46 +81,41 @@ merged_summary_op = tf.summary.merge_all()
 
 summary_string_writer = tf.summary.FileWriter(log_folder)
 
-# Create the log folder if doesn't exist yet
 if not os.path.exists(log_folder):
      os.makedirs(log_folder)
     
-# The op for initializing the variables.
 local_vars_init_op = tf.local_variables_initializer()
 
 combined_op = tf.group(local_vars_init_op, global_vars_init_op)
 
-# We need this to save only model variables and omit
-# optimization-related and other variables.
 model_variables = slim.get_model_variables()
 saver = tf.train.Saver(model_variables)
 
 
-with tf.Session() as sess:    
+with tf.Session()  as sess:
+    
     sess.run(combined_op)
     init_fn(sess)
 
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(coord=coord)
     
-    for i in range(1112*10):
-    
+    # 10 epochs
+    for i in range(1112 * 10):
         cross_entropy, summary_string, _ = sess.run([ cross_entropy_sum,
                                                       merged_summary_op,
                                                       train_step ])
-
-        summary_string_writer.add_summary(summary_string, 1112 * 20 + i)
-        
-        print("step :" + str(i) + " Loss: " + str(cross_entropy))
+        print("Loss: " + str(cross_entropy))
+        summary_string_writer.add_summary(summary_string, i)
         
         if i % 1112 == 0:
-            save_path = saver.save(sess, "/home/jochiu/tf-image-segmentation/tf_image_segmentation/model_fcn8s_final.ckpt")
-            print("Model saved in file: %s" % save_path)
-        
+            save_path = saver.save(sess, "/home/jochiu/Fully_CNN/model_8s.ckpt")
+            print("Saved")
+            
     coord.request_stop()
     coord.join(threads)
     
-    save_path = saver.save(sess, "/home/jochiu/tf-image-segmentation/tf_image_segmentation/model_fcn8s_final.ckpt")
-    print("Model saved in file: %s" % save_path)
+    save_path = saver.save(sess, "/home/jochiu/Fully_CNN/model_8s.ckpt")
+    print("Saved")
     
 summary_string_writer.close()
