@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow.python.ops import control_flow_ops
-from preprocessing.inception_preprocessing import distort_color, apply_with_random_selector
+from inception_preprocessing import distort_color, apply_with_random_selector
 
 slim = tf.contrib.slim
 
